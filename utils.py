@@ -1,11 +1,20 @@
 import tensorflow as tf
 
+def session(graph=None, allow_soft_placement=True,
+            log_device_placement=False, allow_growth=True):
+    """ return a Session with simple config """
+
+    config = tf.ConfigProto(allow_soft_placement=allow_soft_placement,
+                            log_device_placement=log_device_placement)
+    config.gpu_options.allow_growth = allow_growth
+    return tf.Session(graph=graph, config=config)
+
 def disk_image_batch(image_paths, batch_size, shape, preprocess_fn=None, shuffle=True, num_threads=16,
                      min_after_dequeue=100, allow_smaller_final_batch=False, scope=None):
 
     with tf.name_scope(scope, 'disk_image_batch'):
         data_num = len(image_paths)
-
+        print(data_num)
         # dequeue a single image path and read the image bytes; enqueue the whole file list
         _, img = tf.WholeFileReader().read(tf.train.string_input_producer(image_paths, shuffle=shuffle, capacity=data_num))
         img = tf.image.decode_image(img)

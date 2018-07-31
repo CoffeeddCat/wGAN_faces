@@ -4,7 +4,7 @@ import tensorflow.contrib as tc
 def leaky_relu(x, alpha=0.2):
     return tf.maximum(tf.minimum(0.0, alpha * x), x)
 
-class discriminator:
+class discriminator(object):
     def __init__(self):
         self.dim = 64*64
         self.name = 'discriminator'
@@ -41,7 +41,7 @@ class discriminator:
     def vars(self):
         return [var for var in tf.global_variables() if self.name in var.name]
 
-class generator:
+class generator(object):
     def __init__(self):
         self.z_dim = 100
         self.x_dim = 64*64
