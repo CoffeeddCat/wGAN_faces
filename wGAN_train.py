@@ -1,11 +1,12 @@
 import glob
 import tensorflow as tf
 import numpy as np
+from PIL import Image
 from utils import dataset
 from models import generator, discriminator
 
 def preprocess_fn(img):
-    re_size = 64
+    re_size = 96
     img = tf.to_float(tf.image.resize_images(img, [re_size, re_size], method=tf.image.ResizeMethod.BICUBIC)) / 127.5 - 1  #resize the img
     return img
 
@@ -16,7 +17,7 @@ class wGAN:
         self.dataset = dataset
         self.x_dim = 96*96
         self.z_dim = 100
-        self.x = tf.placeholder(tf.float32, [None, self.x_dim], name='x')
+        self.x = tf.placeholder(tf.float32, [None, 96, 96, 3], name='x')
         self.z = tf.placeholder(tf.float32, [None, self.z_dim], name='z')
 
         self.x_ = self.G(self.z)
@@ -29,17 +30,17 @@ class wGAN:
 
         #regularization
         self.reg = tf.contrib.layers.apply_regularization(
-            tf.layers.l1_regularizer(2.5e-5),
+            tf.contrib.layers.l1_regularizer(2.5e-5),
             weights_list=[var for var in tf.global_variables() if 'weights' in var.name]
         )
 
         self.g_loss_reg = self.g_loss + self.reg
         self.d_loss_reg = self.d_loss + self.reg
-
-        self.d_rmsprop = tf.train.RMSPropOptimizer(learning_rate=5e-5) \
-            .minimize(self.d_loss_reg, var_list=self.D.vars)
-        self.g_rmsprop = tf.train.RMSPropOptimizer(learning_rate=5e-5) \
-            .minimize(self.g_loss_reg, var_list=self.G.vars)
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)):
+            self.d_rmsprop = tf.train.RMSPropOptimizer(learning_rate=5e-5) \
+                .minimize(self.d_loss_reg, var_list=self.D.vars)
+            self.g_rmsprop = tf.train.RMSPropOptimizer(learning_rate=5e-5) \
+                .minimize(self.g_loss_reg, var_list=self.G.vars)
 
         self.d_clip = [v.assign(tf.clip_by_value(v, -0.01, 0.01)) for v in self.D.vars]
         gpu_options = tf.GPUOptions(allow_growth=True)
@@ -48,8 +49,9 @@ class wGAN:
     def train(self, batch_size=64, num_batches=1000000, n_critic=5):
         self.sess.run(tf.global_variables_initializer())
         for t in range(num_batches):
-            if t % 500 == 0 or t < 25:
-                n_critic = 100
+            print('now:',t)
+            #if t % 500 == 0 or t < 25:
+                #n_critic = 100
 
             for _ in range(n_critic):
                 bx = self.dataset.batch()
@@ -65,7 +67,7 @@ class wGAN:
                 self.z: bz
             })
 
-            if t % 100 == 0:
+            if t % 1 == 0:
                 bx = self.dataset.batch()
                 bz = np.random.normal(size=[batch_size, self.z_dim])
 
@@ -82,6 +84,18 @@ class wGAN:
                     }
                 )
                 print('Iter time: %8d, d_loss: %.4f, g_loss: %.4f' % (t, d_loss, g_loss))
+
+            if t % 10 == 0 and t > 0:
+                save_dir = './faces2'
+                bz = np.random.normal(size=[batch_size, self.z_dim])
+                bx = self.sess.run(self.x_, feed_dict={self.z: bz})
+                bx = np.reshape(bx, (64,96,96,3))
+                bx = (bx * 255).astype(np.uint8)
+                im = Image.fromarray(bx[0])
+                im.save(r'./res/'+str(t)+'.png')
+                print(bx.shape)
+                print(bx)
+
 
 
 datapaths = glob.glob('./faces/*.jpg')
